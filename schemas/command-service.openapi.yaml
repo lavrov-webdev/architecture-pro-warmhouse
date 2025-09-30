@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Command Service API
+  version: 0.1.0
+  description: |
+    Сервис управления командами. Синхронные запросы для создания задач и асинхронное исполнение команд.
+servers:
+  - url: http://localhost:8090
+    description: Local
+security:
+  - bearerAuth: []
+paths:
+  /commands:
+    post:
+      summary: Order command (async)
+      description: Создать команду немедленного исполнения. Возвращает 202 Accepted.
+      operationId: orderCommand
+      tags: [Commands]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: false
+          description: Ключ идемпотентности для защиты от повторов
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '202':
+          description: Принято к исполнению
+          headers:
+            Location:
+              description: Ссылка на статус команды
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAccepted'
+        '400': { description: Некорректные данные }
+        '401': { description: Неавторизован }
+        '409': { description: Дубликат (по Idempotency-Key) }
+
+  /timed-commands:
+    post:
+      summary: Create timed command
+      description: Создать отложенную или периодическую команду.
+      operationId: createTimedCommand
+      tags: [TimedCommands]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimedCommandCreate'
+      responses:
+        '201':
+          description: Создано
+          headers:
+            Location:
+              description: URL созданного ресурса
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimedCommand'
+        '400': { description: Некорректные данные }
+        '401': { description: Неавторизован }
+
+    get:
+      summary: List timed commands
+      description: Получить список отложенных и периодических команд
+      operationId: listTimedCommands
+      tags: [TimedCommands]
+      parameters:
+        - in: query
+          name: mode
+          schema:
+            $ref: '#/components/schemas/TimedMode'
+          required: false
+          description: Фильтр по типу (ONCE/CRON)
+        - in: query
+          name: enabled
+          schema:
+            type: boolean
+          required: false
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimedCommand'
+                  page:
+                    type: integer
+                  size:
+                    type: integer
+                  total:
+                    type: integer
+        '401': { description: Неавторизован }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+
+    CommandRequest:
+      type: object
+      required: [deviceId, action, correlationId]
+      properties:
+        deviceId:
+          $ref: '#/components/schemas/UUID'
+        action:
+          type: string
+          example: OPEN_GATE
+        parameters:
+          type: object
+          additionalProperties: true
+        correlationId:
+          $ref: '#/components/schemas/UUID'
+
+    CommandAccepted:
+      type: object
+      properties:
+        commandId:
+          $ref: '#/components/schemas/UUID'
+        correlationId:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          example: ACCEPTED
+
+    TimedMode:
+      type: string
+      enum: [ONCE, CRON]
+
+    TimedCommandCreate:
+      type: object
+      required: [mode, command]
+      properties:
+        mode:
+          $ref: '#/components/schemas/TimedMode'
+        runAt:
+          type: string
+          format: date-time
+          description: Время запуска для режима ONCE
+        cron:
+          type: string
+          description: Выражение CRON для периодического запуска
+        timezone:
+          type: string
+          example: Europe/Moscow
+        enabled:
+          type: boolean
+          default: true
+        command:
+          $ref: '#/components/schemas/CommandRequest'
+      oneOf:
+        - required: [mode, runAt]
+        - required: [mode, cron]
+
+    TimedCommand:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        mode:
+          $ref: '#/components/schemas/TimedMode'
+        runAt:
+          type: string
+          format: date-time
+        cron:
+          type: string
+        timezone:
+          type: string
+        enabled:
+          type: boolean
+        nextRunAt:
+          type: string
+          format: date-time
+        command:
+          $ref: '#/components/schemas/CommandRequest'
+
+
