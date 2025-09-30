@@ -1,0 +1,105 @@
+@startuml
+title Диаграмма кода — Command Service
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class Order {
+  +orderId: UUID
+  +createdBy: UUID
+  +createdAt: Instant
+  +status: OrderStatus
+  +idempotencyKey: IdempotencyKey
+  +commands: List<Command>
+  +addCommand(cmd: Command): void
+}
+
+enum OrderStatus {
+  PENDING
+  EXECUTING
+  COMPLETED
+  FAILED
+}
+
+class Schedule {
+  +scheduleId: UUID
+  +ownerId: UUID
+  +trigger: Trigger
+  +enabled: boolean
+  +nextRunAt: Instant
+  +idempotencyPolicy: String
+  +commands: List<Command>
+  +plan(command: Command): void
+  +cancel(commandId: UUID): void
+}
+
+class Trigger {
+  +runAt: Instant
+  +cron: String
+  +timezone: String
+  +isCron(): boolean
+}
+
+class Command {
+  +commandId: UUID
+  +deviceId: UUID
+  +action: String
+  +parameters: Map<String, String>
+  +status: CommandStatus
+  +result: String
+  +correlationId: UUID
+}
+
+enum CommandStatus {
+  NEW
+  SCHEDULED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+class AccessControl {
+  +canExecute(claims: TokenClaims, deviceId: UUID, action: String): boolean
+}
+
+class IdempotencyService {
+  +checkAndReserve(key: IdempotencyKey, scope: Scope): boolean
+  +release(key: IdempotencyKey, scope: Scope): void
+}
+
+class IdempotencyKey {
+  +value: String
+  +ttlSec: int
+}
+
+enum Scope {
+  ORDER
+  SCHEDULE_RUN
+}
+
+class TokenClaims {
+  +userId: UUID
+  +roles: List<String>
+  +householdId: String
+}
+
+
+
+Order *-- "1..*" Command : агрегирует
+Schedule *-- "0..*" Command : агрегирует
+
+Order ..> IdempotencyService : использует
+Schedule ..> IdempotencyService : использует
+
+note right of AccessControl
+  Используется на уровне контроллеров
+  для проверки прав по клеймам токена
+end note
+
+note bottom of IdempotencyService
+  Единая дедупликация для заказов и
+  запусков расписаний
+end note
+
+@enduml
+
