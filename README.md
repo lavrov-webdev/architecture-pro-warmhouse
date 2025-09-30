@@ -14,31 +14,70 @@
 
 **Управление отоплением:**
 
-- Пользователи могут…
-- Система поддерживает…
-- …
+На данный момент система управления отоплением не реализована
+
 
 **Мониторинг температуры:**
 
-- Пользователи могут…
-- Система поддерживает…
-- …
+Пользователи могут подключать / изменять / удалять датчики, получать информацию о текущем состоянии датчика (активность, текущее значение, тип и проч.). 
+На данный момент система представлена в виде единого сервиса датчиков, реализовано базовое обращение к системе контроля температуры (но поскольку она пока не реализована, берутся данные из датчиков). Система датчиков хранит в себе полную информацию о датчиках, в т.ч. их текущее значение; через неё же обновляется значение датчиков. 
+
 
 ### 2. Анализ архитектуры монолитного приложения
 
-Перечислите здесь основные особенности текущего приложения: какой язык программирования используется, какая база данных, как организовано взаимодействие между компонентами и так далее.
+- Язык программирования: Go
+- База данных: PostgreSQL
+- Архитектура: Монолитная, все компоненты системы (обработка запросов, бизнес-логика, работа с данными) находятся в рамках одного приложения. Есть не имплементированный интерфейс сервиса температуры.
+- Взаимодействие: Синхронное, запросы обрабатываются последовательно.
+- Масштабируемость: Ограничена, так как монолит сложно масштабировать по частям.
+- Развертывание: Требует остановки всего приложения.
+- Инфраструктура: Приложение упаковано в docker-compose вместе с БД
 
 ### 3. Определение доменов и границы контекстов
+На данный момент в системе реализован только один домен (As-Is):
+Домен умного дома
+ - Поддомен датчиков
+	- Контекст управления датчиками (подключение, отключение)
+	- Контекст получения информации с датчиков
+	- Контекст обновления значения датчика
 
-Опишите здесь домены, которые вы выделили.
+Конечная цель проекта (To-Be):
+
+### DDD (To‑Be): домены и границы контекстов
+
+- Ядро (Core) — управление умным домом:
+  - Реестр устройств и ввод в эксплуатацию (provisioning): каталог устройств, привязка к дому/«семье», паринг/закрепление владения.
+  - Телеметрия и события: приём, нормализация и хранение телеметрии; публикация событий.
+  - Команды и управление: синхронные/асинхронные команды к устройствам с гарантиями доставки и идемпотентностью.
+  - Автоматизация и сцены: правила, триггеры, расписания; реакция на события телеметрии.
+  - Прошивки/OTA (опционально для MVP): обновления, поэтапный выпуск/откат, совместимость.
+
+- Аутентификация и доступ (IAM/тенантность):
+  - Пользователи, «семьи»/домохозяйства, роли и доступ к устройствам; учётные данные устройств; мульти‑тенантность.
+
+- Вспомогательные домены:
+  - Жизненный цикл устройств: регистрация/конфигурация, замена/деактивация, диагностика.
+  - Уведомления и оповещения: e‑mail/SMS/push/webhooks; политики эскалации.
+  - Поддержка пользователей: база знаний, тикеты, доступ только для чтения к устройствам и журналам.
+  - Наблюдаемость и диагностика: здоровье устройств и платформы, аудит.
+
+- Универсальные (generic) домены:
+  - Маркетинг.
+  - Аналитика (продуктовая/бизнес; не путать с телеметрией в ядре).
+  - Электронная коммерция (e‑commerce).
+  - Биллинг и подписки: планы, тарифы, квоты, учёт потребления и платежи.
+
 
 ### **4. Проблемы монолитного решения**
 
-- …
-- …
-- …
+- Сложно масштабировать
+- Нет разбиения на домены, для исправления приходится держать в голове большой контекст
+- Невозможно "таргетно" адаптировать нагрузку
+- Весь сервис (в т.ч. БД хостятся на одной машине)
 
-Если вы считаете, что текущее решение не вызывает проблем, аргументируйте свою позицию.
+Проблемы, не связанные с монолитом:
+- Запросы отрабатывают синхронно, при большой нагрузке сильно возрастёт задержка
+- Данные о датчиках обновляются по запросу в эндпоинт, то есть датчики не хранят в себе информацию о своём состоянии, не ясен источник истины
 
 ### 5. Визуализация контекста системы — диаграмма С4
 
@@ -46,15 +85,11 @@
 
 Чтобы добавить ссылку в файл Readme.md, нужно использовать синтаксис Markdown. Это делают так:
 
-```markdown
-[Текст ссылки](URL)
-```
+[Context schema As-Is](https://plantuml.com/plantuml/png/RL9DRzf04BtxLqmvKIc4IqyzfQAbFIHL18bwZ8RT0O-q7zRic2R_lhCsTH3XXkVvVRo7xugYQ1z3ewo1OCrwptk2LKvAhmhV6G-2iMaqTw0PTbarH_0iv9HpQffFd5peFVKIe5NjojVbKl3lxO6rxNTz8N5LA-cjot6vOOVYys-cZi9ozMNn633fyyFzCc9H4Zkzh7BiSggChWPh7abAJlCgTGEp3HNs1ixizpVe1Wm27paTW1DeIz1cUtVs-JzHoRM97MCoofefU7YQJgEC8r7UCtde9E-f5Ak60OIA9Icy2mJxB8DuJel2IkPL54D0vMowrYtoGBCSDu39GqIklJ4v8-sXH1IrQ970qv4T5KlORD-AKfp_GOc_QkhnsJBLorW4od2hGKVKb1CUp6UqCKlDKXyBfPBbJFVbnwlENU28IlKVbHos9DNSn5RZ7Ku0d93gyzIo-4M7ec_WGkuzb16iynpPLpEXc9N0N3eIr5xg93PI71Qn3ATgOwY76faY9PqQRWS0tX7OJaKtX66X76aorXOL-iwZKZat0jpbNi-hDniAfu_buwm_IS7r8fGcpaLiOvz_CPSIip5lcHn7nkLhrqUVhKbTI-LYjKlxwvDzZF9yckDwaJjAle_X7m00)
 
-Замените `Текст ссылки` текстом, который хотите использовать для ссылки. Вместо `URL` вставьте адрес, на который должна вести ссылка. Например:
 
-```markdown
-[Посетите Яндекс](https://ya.ru/)
-```
+[Context schema To-Be](https://www.plantuml.com/plantuml/png/TP9FInjH5CNt-HIlMKM8pgQhhgGYT5516akNaZ-Z6Jf_mimRgfH2a_xfegNINLULwhAR61qTdPY0d-2-RzHpUEg4a2XXPjwxzvnxV_Uk9xePwpJmAq-yiEsd7LTrjUubpnmdRhvRs_TqDssbYHkter2xeLvhHu7JyviXSrOJtV6zbhFnT7MRHw-tNZf1Cz5kZAFT3MOSwBKUrIlRRfn4OOrITLMLOvb8ONx85PuZ6Pg1PFokykvKfkQZ36M4aoF9p42PJpAMM_DTnaeka37chxho8AhTTZVqsbupPFe9Khx8hUHoKxstGj8Dn7wQRx3XJQOaLpW_Ctqfe7ufESkmTx0pVJD03HEvvfkCIgyaxVMYM5FuhqmOXVGBQwTaIY_yPqY-X6S-Kq5vEbGiXrPeQa02TVQLeu1pA4teAJa3uLjf789eiFiyIiDECpwiWRxUY-B0AXU4PpxB1DfZAD_zanFp2uKKm7LzZ-kkgAweznM5FwjMQqUnkr00pPVuBIrpD3yMoPQIGi1Oyhgo4yLlB1aZA5DNJ6V7T6AFSeNdLzwXqm-FlMuUw5hBytqltBUWSufJZEpEa5UG7ueu1oE6_94p5eSxpCGY1WAxM62U4KN-C9yfzV1s0zCPnp3ItjwXDUIeHWnJb8Lx7pWBvj1kSpLeUhxJs6eulJJfajb8CikwfCRXlNBz-vr_8FuRrjEPxI_NhZQFdgSWsGSXVWr9KV8LLl1YPsUx0GFgpwu_NPOklRDiu-SKooMdtC8DTfRiQobaUxS2CxCydfbAFZyJIEIF4iuRjzMDehS9j4gfSaYd2valobvtmquQ-Fy1)
+
 
 # Задание 2. Проектирование микросервисной архитектуры
 
@@ -62,11 +97,16 @@
 
 **Диаграмма контейнеров (Containers)**
 
-Добавьте диаграмму.
+[Containers schema](https://plantuml.com/plantuml/png/dLNDRjj64BxhAROwqO1YNdhgAOeJD2sYLWrTv1XGqYOYoX-1N3OrYWAHdDG75KbJ56rH56YT77BeHMubbxP-3EG9bg_G9-atovKeKrI3sB3DvN3d-sPdlfcz7Wax5B7dLjvp_BORTpZh2j6BFZ3Dq7wq-z0HtRWLHpni1xxWljXj1vxPSssVVAv5ekCwBNFl_MjDCdtUk6DwTYHu2DFzFNZOZi_3tHxXLuGZNCxaSVfKJkHCZfWybmivJmTuFPDpEKaVu_ql9Y_aL8xIGVf4Bc2QfKFsva_vCdr17zAXF6DoZ8spDzDAfSd3AF0D2h36gl9tsAVfT_8V0W86eEczIjzUoGkWZM2Vfiz1Dc3fOTe73R6UqOfS45Z2y8ltR-4yboDyJ-00UtLdoITuk-ixRSVs2Vabq9vYQoBFgpeAH7WEdcVf4K3eouH0OJz9-x0VobFOGAU_RKQISqLnhnU4We2FvO9smNsSqL6kY6kiadSApYIF8BTckPuI5UKxot92QKmGmj_0MYZMXBQ2kM8Te8ZU_Hj1x7ViyC10mSM38FGKzkNg07jBTQexxEiAmyzA28OTYoumwdWmYuTVEcrEyTxUts-oUlCZ5ViVSeAG4fsG4Sg0z9iWNP1PpcliutlxDKR9eYEPHASs7yeBcFiaBaW0rIgGUu4Vk8uAmF8WUdOxy3XhQEjw7CpuCDYfwjA218Wac4m9EdEKWYFAM0bJs-l0UI_mFDllR3tehvGc9O5nEeG4SdrIcOWAHkoO8wipdLNwAzBTR1cT5W2RGIGUXjpwx0x1txrves5LjpQ5JDPpLIkS2Dy6coVVEESZJhptU8lLUxsgNXfMivubxmUud_px-0LLZV2Wt2SmGU7GRLbG9HHUq79S3hI6MYo9d4yji-vtmi3fAAhVgBN0Gv1ph2TWeA2LR4xp7jnE-yrAzRU-4WQUlNhF0VG-LZoqHHnoNJbLnPKwPi34oLJs3kcfI9WYFi_a2y4OghJph8Wxe5lZyWFXF3Z8s3wXjTEsXHFuKP7FQbZcBSzsNBCPHrs80qUOP92vPgXzxt9NZyIiGlANj5yykiw8eJ1ETfOy5lnpTvtzjo10bIK8wpDosNg5EPpNPLrzQWONqF8fk0xrOzdyCWcV31GNIVV_0jC3INwFsWtqT4oWKaBIesTh9E_egvmp7zMkyZNswmIOoEb8Nj3KosuhDB6cq-TzHo-QGDhX9oNBENPESGlaCyS4n5WBUB4wW4xbEbuEk9xxrw0T04bTfFtC2_-Vwz1AviUpPJOsJfPtc_mPaBf-c46R_PKEo_fhA_9wRybNPVt2ZCjjbUlOn3Jh1i4NaKQrumt4OtcYOqLG8reguBEQlfZf9jUNyFZI44gFS9pXAajqcLA9D1EwzWhIr7werCRjKhenprBfFMSMBha2X1uDLmbJkswFj6JlrOEzplrExBd_0G00)
 
 **Диаграмма компонентов (Components)**
 
-Добавьте диаграмму для каждого из выделенных микросервисов.
+[Auth component](https://plantuml.com/plantuml/png/fLPDRnjL5DtFhtXavKXDPyEALHst4g0OcJYbosWyyx177S-CthnfYH1IdHGAIgL2rHM85YGaM3eGjwvTEt_XpZ_Y7ddiyVXr36gpSDx7k-VSZtkkVIFHZj9fFx0-y4CtI3qfUbh7oKUshPpxrxk-xgMTD97AZK8jGttTZVfs73WXRFOIxGL-nsvykDV2qUtcWTrt4YqL7nqteduSXR29WMzfNmTIqCyqfpTqnPyp6j4iEytEHJtLFT6MwfxlIijgC9NZXrBLtC1d-sjYfu655lKuJdPuUqTsx6RKyGE97Jrbe0j1Oy70SxgWCKspnpJZzKZGLVO01xnv2JvUuv2tUFEA__zDm-oKHhn_ihDhMUqJ3g1_VEihNGiZxNzvKezz9laCQzzrj1-5YQYtFW7pnqT7BVnlDzlshRxZ1tOhJNeYEsFG4LqI8fqkM05UH7QpK_CwRDYA4jrLiltv0M0ER-utsrZGSxh8Vc2_dWZwYPw9sjiTfl4raGruzOPli3xB7j68xsRPEKV9ZuTiEEOdurrcB-YFzwCqz1nrKdCuyqouNe2TNV6r9VXlLS2QabtOgYW8f8AZikidMZb8Hd6ndX7wZTtw1znSu0Viy7T8WU1CmFyvNystLQ5CxtZURMx1aWiuQ3gXqvLzVbBXn3Eq0mqPV5hK_frSqD5T6POSEC991UyBeA8QArO6djC4MnfoEQVWvuiPryN8TI9rYQdb9CdzI7c7kAbW_9qkECtpR82GXbY-DOnxKd57bz2_m57Us5l2kUG8kAaP-ILTbeIKFOA6xKNg-CL3cYDAWpkHRgfyVGAzv4kW7_WTnPreBxiFX7znipn44AZ9Wegx-ri6_vx6c-USIBWpMckp8jjuQlQJwyeaoOD5zw_luS2wBozoFk1FQ8WnW_3e5JxNAundQBFNDcOEkavW1401F12kKFV3_Nh3h7W-PZmdrb9jZ9hyT5aEiHY4sDAFZ3vagbEu9cWYsCaPKeHF7WbdmfXPJFsDPHtAO3LPIygkrEsIliq09ND3cHMggn9QDR8fEFfbAHfEy5Q1LO8QsgeIJYM28Q2jyf1x-58mf66WRrJ1wm3sJpRBWUnYb6UFOOqlZ5sO5hFntSoDDBydzwQqwDV_9nK0--5Uh2BOLpbNZ90ywqk_W5EMwQTtZWnCW9hpTLD-z9o3pzqYG37183kdAHhCfWbuGPKxQNJ4VmFILKN7lCunDn3MVuVGqvN8aKhpfqP9hpR_Kkf5qLr4NmHlbFiFnffaWzNyN9HyeGk4QfS7Qj45PWAgGJ5I87oMxQ0o2NXPmD-GePVsWty1)
+
+[Commands component](https://plantuml.com/plantuml/png/jLPDRzj64BthLsnzKW0xlFJKKnovG094g6kbwD6Wo4LCW1y4kMfh50Nig6qE2ffR0nH5WnOeUcMTi9BbMFaBmt_KDrbnIP6C1QEe3kBkSFUzcJSpkxoNAZjHay3lVUI5ZZznfJXHAau_iQp4_lhk4q-TJCQJL2PE52ePghjE55YnRuUyPozLhk-DhS77UuTi-cBuo0hiLCa4fkD15CHHo7jYnkyfJ_bIq2-qehVq3l_NbDDryRIO2ImDxD0L8vbyvJcornk0pVP2cVGTtmF4hjWPl1-8_JXETp3zKewjOJJsVCape5xHOertJaiU2tfNd65m1Qf_-1KjYXSxTtgZKtWO77_wZUe7KHZv2148em0wY0TH8CLmRMNW1uyV7uhzmuSyfZye1reEztFGd36Ue8MWDvHX_WnS80Q3yVvWt7V7s7aOfUf98aUVFsASeuFxmn4FwETY2fXhokXAO2yBas7wPbS0-vn50jzrwVkkmEACxSHlCnDHHNXyFvg4hfsSzft01KD3s9qxujkUmC_afk_e5OoGHBul4zxLj9LAy9D-fTTWNj45-mN1PtGfQ4uPv9wozXkHmBjDljGvaUu4c1kC8sFjvdm57NIyPyoinvHRHemLBQrYofdW3Ect7NBH9HngU1Gb84zLOgke5lndDIkxK2h8tlm6u2Lgu1nPPueVEGyVJbckbz6Y9ORdIWpHLyufS1zMingR6UegBtxYGWCPOirr8nLFTU5pLjWdMbYKiO4NGPI_kJS-d8Yw_4t2F-4ue8oYODQLZnfuZS3E1DDNBSRbKFoWou6xubcBrdOScQR0tdy_MEUxoVjAvnaCh7IcMpcZ2y7D8egfbXvBBdd41M6n7cOAwLk9Djq-A8-KuOR1j7irfR-0PghfNCkB_nSwknOcZHD1fsOkO5bnFbXwhCfQEYGoZbY68tvwA39FfanvO2jRQ6rqogjUAcQtEHTsRwoHuZay-gxNEvA-EMAxZWBw7LnppYNliUYYc1dw1PiskhsObYAE05_7RhTz6xsxcpLDLo_dTJBDrev0rzjDDSKeNhWN9n6lNFjj_FslMDrUrHk_3RUbkxSx_F_HTCHIFpzlTpgs69YYSHwtcdPRJt8z8X1Ui-HNvXxH0JJnoZaZlwIC4ycGdSXQBc1Z-Zrcq90NQ5KDJsSOPRjh3XP3rtHESnJwLV4SG01Ze6rIRScvCTRxozoNqx9IQzTaTLhZ-NPRVPbOpEtG0RG5ebKpBwlFXzQDmgVyvYapwuIl5VjDFYxr7SgNHIVCUgSxRjIQHVCgTRmJNtFOSa-6xYJm_mK0)
+
+[Sensors monolith](https://plantuml.com/plantuml/png/jLHDJzjA5DtxLypBof40RzxghGZXILGYKagekaIECm9BjiSQZzkYgX8GzQC22QbgLQaBKDj5jm65OX8-_iBCF-gvav00iTGLICHtPdpFEVVSErxCb2zL7aVEFs4IH7c7iosbqkm_pvF-ouNDK6tbxJpZCX29uebQ24JifP6VKCvyfZfHsFRg_yutQUjPOzMB_KnnYQsDkeXJaL1EIlYE2bN4cVwch_Mbli7lbJxJLsRFxBDM315iHSISDKGY8h0o5syLUAV0iwU7vW1npnmoiuUqWUcQZtQfJ_MPsJ6xkZ27LSUfGwOV9bowGHI2UuvLwZPWjJJDAbW-vssl8TfXn6a5EKDGM2406L3Cz8tPGJ24njzqHDYC95iPvtYUWXiwi3wiL9qcbvb8NCM3hIGCGZyXu1_GzTRg7rYY8tq2Wg7f0hCW03eZie81y0GhWXqIdzr7XRlGj8Fj2uhqwPGfozDKI4Mmt_KrlGNO_eZC2iMYJxw02oLP_cE2WeBBKK89FaaPLON_IwJJQO5q-DhQHblZZVzVAHVFj9Q6m5n7nAMlSibPhVc4Q5RMrvkLSVdKPX91Ne4DJwkDMMC7s7r7wCob4sZlqs1KGJRfuNBRxRG1rXIPsfIyzNILeDUMbnejo_7pOGMwDrTIWUtH57LZIUH9nvVRRZoUDM2LJ62bobux37-JGNOpdcH2PYj-qecufBHx6_SC-ABxDBzcNrymFQ1n7siTaZeq0ETap7jTq36rzm6RcjhRul95673oV6QJsEw4-YlSl1ar6sRCji7ibxLXXbtoL6HaDpr39MJ8xVrPzfNFQa70CxlKd-zKKTWHAc_06yTPuz7aMivOgOz6CYTp0VdtBEe1iF1cqH5Vt3hV0f6bcTx5nwQQNCP7vta0VziW_Si2sA-6fy-f-x1yrnmGGfZCfrBOPbKjoZYhq_vR9jssQYbnwLpgO_jvx59bAEAWVFIwPQDNghECPFhbqP_q5O0_a7QwN-VJcR_r3JYBFEdaSVG7)
+
 
 **Диаграмма кода (Code)**
 
