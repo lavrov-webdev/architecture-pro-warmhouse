@@ -1,0 +1,134 @@
+@startuml
+title ER-диаграмма — Основные сущности системы
+
+' Crows Foot notation for ER
+left to right direction
+hide circle
+skinparam linetype ortho
+
+entity "households" as households {
+  * id: UUID <<PK>>
+  --
+  name: text
+  created_at: timestamptz
+}
+
+entity "users" as users {
+  * id: UUID <<PK>>
+  --
+  email: text <<UNIQUE>>
+  phone: text?
+  global_role: text  ' user|technician|support
+  created_at: timestamptz
+}
+
+entity "user_households" as user_households {
+  * user_id: UUID <<FK users.id>>
+  * household_id: UUID <<FK households.id>>
+  --
+  role: text  ' owner|member|technician|support
+  added_at: timestamptz
+  <<UNIQUE (user_id, household_id)>>
+}
+
+entity "devices" as devices {
+  * id: UUID <<PK>>
+  --
+  household_id: UUID <<FK households.id>>
+  type: text
+  model: text?
+  status: text
+  firmware_version: text?
+  created_at: timestamptz
+}
+
+entity "sensors" as sensors {
+  * id: UUID <<PK>>
+  --
+  household_id: UUID <<FK households.id>>
+  device_id: UUID? <<FK devices.id>>  ' может быть автономным
+  kind: text
+  unit: text?
+  status: text
+  location: text?
+  created_at: timestamptz
+}
+
+entity "telemetry" as telemetry {
+  * id: UUID <<PK>>
+  --
+  sensor_id: UUID <<FK sensors.id>>
+  ts: timestamptz
+  value: numeric
+  attributes: jsonb?
+}
+
+entity "schedules" as schedules {
+  * id: UUID <<PK>>
+  --
+  household_id: UUID <<FK households.id>>
+  owner_id: UUID <<FK users.id>>
+  trigger_type: text   ' run_at | cron
+  run_at: timestamptz? ' nullable
+  cron: text?          ' nullable
+  timezone: text
+  enabled: boolean
+  next_run_at: timestamptz?
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+
+entity "commands" as commands {
+  * id: UUID <<PK>>
+  --
+  household_id: UUID <<FK households.id>>
+  device_id: UUID <<FK devices.id>>
+  schedule_id: UUID? <<FK schedules.id>>
+  created_by: UUID <<FK users.id>>
+  action: text
+  parameters: jsonb
+  status: text
+  result: jsonb?
+  correlation_id: UUID <<UNIQUE>>
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+
+' Relationships (crows foot)
+households ||--o{ devices : has
+households ||--o{ sensors : has
+households ||--o{ schedules : has
+
+users ||--o{ user_households : memberships
+households ||--o{ user_households : members
+
+devices ||--o{ sensors : contains
+sensors ||--o{ telemetry : measures
+
+schedules ||--o{ commands : generates
+devices ||--o{ commands : targets
+users ||--o{ commands : creates
+
+note right of sensors
+  sensor.device_id может быть NULL,
+  если датчик автономный
+end note
+
+note right of schedules
+  Индекс: schedules(household_id, next_run_at)
+end note
+
+note right of telemetry
+  Индексы/партиционирование:
+  - telemetry(sensor_id, ts)
+end note
+
+note right of commands
+  Индексы:
+  - commands(device_id, status)
+  - commands(schedule_id)
+  - UNIQUE(correlation_id)
+end note
+
+@enduml
+
