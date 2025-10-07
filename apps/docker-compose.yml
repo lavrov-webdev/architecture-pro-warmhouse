@@ -18,10 +18,15 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - smarthome-network
-  ## тут нужно добавить настройки
 
-  # temperature-api:
-  ## тут нужно добавить приложение
+  temperature-api:
+    build: ./temperature-api
+    container_name: smarthome-temperature-api
+    restart: unless-stopped
+    networks:
+      - smarthome-network
+    environment:
+      - PORT=8081
 
   app:
     build: ./smart_home
