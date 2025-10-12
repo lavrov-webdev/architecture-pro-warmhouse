@@ -43,6 +43,13 @@ services:
     networks:
       - smarthome-network
 
+  command-service:
+    build: ./command_service
+    container_name: smarthome-command-service
+    restart: unless-stopped
+    networks:
+      - smarthome-network
+
 volumes:
   postgres_data:
 
