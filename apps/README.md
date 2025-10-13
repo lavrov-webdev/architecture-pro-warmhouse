@@ -11,20 +11,14 @@
 The easiest way to start the application is to use Docker Compose:
 
 ```bash
-./init.sh
-```
-
-This script will:
-
-1. Build and start the PostgreSQL and application containers
-2. Wait for the services to be ready
-3. Display information about how to access the API
-
-Alternatively, you can run Docker Compose directly:
-
-```bash
 docker-compose up -d
 ```
+
+This will:
+
+1. Start PostgreSQL
+2. Run a one-shot migrator that applies the schema from `smart_home/init.sql` to the `smarthome` database
+3. Start the application once the schema is ensured
 
 The API will be available at http://localhost:8080
 
