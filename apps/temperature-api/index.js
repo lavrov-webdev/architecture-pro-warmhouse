@@ -64,6 +64,15 @@ app.get('/temperature', (req, res) => {
     res.json({ value });
 });
 
+app.get('/temperature/:sensorId', (req, res) => {
+    const sensorId = req.params.sensorId;
+    const sensor = DATA_BASE.find(item => item.sensorId === +sensorId);
+    if (!sensor) {
+        return res.status(404).json({ error: 'Sensor with ID ' + sensorId + ' not found' });
+    }
+    res.json(sensor);
+});
+
 app.listen(port, () => {
     console.log(`Temperature API listening on port ${port}`);
 });
