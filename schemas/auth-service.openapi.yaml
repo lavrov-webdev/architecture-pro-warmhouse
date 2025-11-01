@@ -1,0 +1,112 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  version: 0.1.0
+  description: API аутентификации и выдачи токенов
+servers:
+  - url: http://localhost:8089
+    description: Local
+paths:
+  /auth/sign-up:
+    post:
+      summary: Регистрация пользователя
+      operationId: signUp
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '400': { description: Некорректные данные }
+        '409': { description: Пользователь уже существует }
+
+  /auth/sign-in:
+    post:
+      summary: Вход пользователя
+      operationId: signIn
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tokens'
+        '401': { description: Неверные учетные данные }
+
+  /auth/token:
+    post:
+      summary: Получение нового access токена
+      operationId: getToken
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Новый access токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tokens'
+        '401': { description: Неверный или просроченный refresh токен }
+
+components:
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+
+    SignUpRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        phone: { type: string }
+
+    SignInRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    TokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    Tokens:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    AuthUser:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        email: { type: string, format: email }
+        phone: { type: string }
+        createdAt: { type: string, format: date-time }
+
+

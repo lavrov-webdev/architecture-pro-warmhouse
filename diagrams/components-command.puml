@@ -1,0 +1,43 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты Command Service
+
+Container(client, "Client Apps", "Web/Mobile", "Клиентские приложения")
+System_Ext(monolith, "Smart Home Monolith", "HTTP API", "Телеметрия и датчики")
+ContainerDb(db, "PostgreSQL", "RDBMS", "Журнал команд, исполнения, расписания")
+
+Container_Boundary(cmd, "Command Service") {
+    Component(commandController, "CommandController", "HTTP", "Мгновенный запуск команд")
+    Component(schedulerController, "SchedulerController", "HTTP", "Планирование/список/удаление расписаний")
+
+    Component(orchestrator, "CommandOrchestrator", "Service", "Оркестрация исполнения, ретраи")
+    Component(idempotency, "IdempotencyService", "Service", "Ключи идемпотентности/антидубли")
+    Component(scheduler, "Scheduler", "Service", "Хранение и триггер отложенных задач")
+    Component(access, "AccessControl", "Service", "Проверка прав на устройства/действия")
+
+    Component(monolithClient, "MonolithClient", "HTTP Client", "Чтение состояния/телеметрии из монолита")
+    Component(repos, "Repositories", "Data Access", "Команды, исполнения, расписания, идемпотентность")
+}
+
+Rel(client, commandController, "Создать/выполнить команду", "HTTPS")
+Rel(client, schedulerController, "Создать/список/удалить расписание", "HTTPS")
+
+Rel(commandController, access, "Проверка прав", "in-process")
+Rel(schedulerController, access, "Проверка прав", "in-process")
+Rel(commandController, idempotency, "Проверка идемпотентности", "in-process")
+Rel(schedulerController, idempotency, "Проверка идемпотентности", "in-process")
+Rel(commandController, orchestrator, "Оркестрация исполнения", "in-process")
+
+Rel(orchestrator, monolithClient, "Чтение состояния/контекст", "HTTP")
+Rel(monolithClient, monolith, "Запрос состояния/идентификаторов", "HTTP")
+
+Rel(orchestrator, repos, "Запись результатов исполнения", "in-process")
+Rel(schedulerController, scheduler, "Создание/управление задачами", "in-process")
+Rel(scheduler, repos, "Хранение задач", "in-process")
+Rel(scheduler, orchestrator, "Запуск отложенной команды", "in-process")
+Rel(idempotency, repos, "Хранение ключей", "in-process")
+Rel(repos, db, "Чтение/запись", "SQL")
+
+@enduml
+

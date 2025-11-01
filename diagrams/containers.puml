@@ -1,0 +1,45 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Схема контейнеров платформы «Тёплый дом»
+
+Person(user, "Пользователь", "Управляет устройствами и сценариями")
+Person(technician, "Техник", "Подключение и обслуживание устройств")
+Person(support, "Сотрудник поддержки", "Поддержка клиентов и диагностика")
+
+System_Boundary(platform, "Платформа «Тёплый дом»") {
+    Container(auth, "Auth Service", "HTTP API", "Регистрация/логин, JWT, роли/доступ, семьи")
+    Container(monolith, "Smart Home Monolith", "HTTP API (Go)", "Телеметрия и датчики")
+    Container(cmd, "Command Service", "HTTP API", "Команды управления умным домом")
+    ContainerDb(db, "PostgreSQL", "RDBMS", "Пользователи, семьи, датчики, телеметрия")
+    Container(web, "Web App", "Web (SPA)", "Веб‑интерфейс пользователя")
+    Container(mobile, "Mobile App", "iOS/Android", "Мобильное приложение пользователя")
+}
+
+System_Ext(tempApi, "Temperature API", "HTTP", "Температура по локации (рандом)")
+System_Ext(notifyApi, "Notifications API", "HTTP", "SMS/Email/Push уведомления")
+
+Rel(user, web, "Использование (веб)", "HTTPS")
+Rel(user, mobile, "Использование (моб)", "HTTPS")
+Rel(technician, monolith, "Управление датчиками", "HTTPS")
+Rel(support, monolith, "Диагностика/просмотр", "HTTPS")
+Rel(technician, auth, "Аутентификация", "HTTPS")
+Rel(support, auth, "Аутентификация", "HTTPS")
+
+Rel(auth, db, "Чтение/запись", "SQL")
+Rel(monolith, db, "Чтение/запись", "SQL")
+Rel(cmd, db, "Журнал команд/идемпотентность", "SQL")
+
+Rel(cmd, monolith, "Читает состояние/телеметрию", "HTTP")
+Rel(monolith, tempApi, "Запрос температуры по локации", "HTTP")
+Rel(monolith, notifyApi, "Уведомления (SMS/Email/Push)", "HTTPS/Webhooks")
+Rel(auth, notifyApi, "Сброс паролей, подтверждение почты/телефона")
+Rel(web, auth, "Аутентификация", "HTTPS")
+Rel(web, cmd, "Команды", "HTTPS")
+Rel(web, monolith, "Телеметрия/датчики", "HTTPS")
+Rel(mobile, auth, "Аутентификация", "HTTPS")
+Rel(mobile, cmd, "Команды", "HTTPS")
+Rel(mobile, monolith, "Телеметрия/датчики", "HTTPS")
+
+@enduml
+

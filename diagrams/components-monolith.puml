@@ -1,0 +1,31 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты Smart Home Monolith (минимальная текущая версия)
+
+Container(client, "Client Apps", "Web/Mobile", "Клиентские приложения пользователя")
+Person(technician, "Техник", "Обслуживание и обновление устройств")
+Person(support, "Сотрудник поддержки", "Просмотр устройств и телеметрии")
+
+System_Ext(tempApi, "Temperature API", "HTTP", "Температура по локации (рандом)")
+ContainerDb(db, "PostgreSQL", "RDBMS", "Устройства, телеметрия")
+
+Container_Boundary(monolith, "Smart Home Monolith") {
+    Component(sensorsHandler, "SensorsHandler", "HTTP", "Единый контроллер датчиков")
+    Component(temperatureService, "TemperatureService", "Service", "Запрос температуры по локации")
+    Component(repos, "Repositories", "Data Access", "Датчики и телеметрия")
+}
+
+Rel(client, sensorsHandler, "Операции с датчиками/телеметрией", "HTTPS")
+
+Rel(technician, sensorsHandler, "Операции с датчиками/телеметрией", "HTTPS")
+
+Rel(support, sensorsHandler, "Операции с датчиками/телеметрией", "HTTPS")
+
+Rel(sensorsHandler, repos, "Чтение/запись", "in-process")
+Rel(repos, db, "Чтение/запись", "SQL")
+Rel(sensorsHandler, temperatureService, "Получить температуру по локации", "in-process")
+Rel(temperatureService, tempApi, "Внешний запрос", "HTTP")
+
+@enduml
+

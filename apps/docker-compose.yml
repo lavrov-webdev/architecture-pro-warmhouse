@@ -4,21 +4,38 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: smarthome-postgres
-  ## тут нужно добавить настройки
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=smarthome
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smarthome || pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smarthome-network
 
   temperature-api:
-  ## тут нужно добавить приложение
+    build: ./temperature-api
+    container_name: smarthome-temperature-api
+    restart: unless-stopped
+    networks:
+      - smarthome-network
+    environment:
+      - PORT=8081
 
   app:
-    build:
-      context: ./smart_home
-      dockerfile: Dockerfile
+    build: ./smart_home
     container_name: smarthome-app
     depends_on:
       postgres:
         condition: service_healthy
-      temperature-api:
-        condition: service_started
+      migrator:
+        condition: service_completed_successfully
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/smarthome
       - TEMPERATURE_API_URL=http://temperature-api:8081
@@ -27,6 +44,28 @@ services:
     restart: unless-stopped
     networks:
       - smarthome-network
+
+  command-service:
+    build: ./command_service
+    container_name: smarthome-command-service
+    restart: unless-stopped
+    networks:
+      - smarthome-network
+
+  migrator:
+    image: postgres:16-alpine
+    container_name: smarthome-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=postgres
+    command: sh -c "psql -h postgres -U postgres -d smarthome -v ON_ERROR_STOP=1 -f /schema/init.sql"
+    volumes:
+      - ./smart_home/init.sql:/schema/init.sql:ro
+    networks:
+      - smarthome-network
+    restart: "no"
 
 volumes:
   postgres_data:

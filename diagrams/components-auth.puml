@@ -1,0 +1,45 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты Auth Service
+
+Container(client, "Client Apps", "Web/Mobile", "Веб и мобильное приложение пользователя")
+
+System_Ext(notifyApi, "Notifications API", "HTTP", "SMS/Email/Push уведомления")
+ContainerDb(db, "PostgreSQL", "RDBMS", "Общая БД (пользователи, семьи, учетные записи)")
+
+Container_Boundary(auth, "Auth Service") {
+    Component(regController, "RegistrationController", "HTTP", "Регистрация нового пользователя")
+    Component(addUserController, "UserManagementController", "HTTP", "Добавление нового пользователя")
+    Component(tokenController, "TokenController", "HTTP", "Получение токена (логин)")
+    Component(resetController, "PasswordResetController", "HTTP", "Сброс пароля")
+    Component(verifyController, "VerificationController", "HTTP", "Подтверждение почты/телефона")
+    Component(security, "Security", "Library/Service", "Шифрование, хеширование, генерация токенов")
+    Component(accessControl, "AccessControl", "Service", "Проверка и назначение ролей/прав доступа (RBAC)")
+    Component(notifyAdapter, "NotificationAdapter", "HTTP Client", "Адаптер к внешнему Notifications API")
+}
+
+Rel(client, regController, "Регистрация", "HTTPS")
+
+Rel(client, addUserController, "Добавление пользователя", "HTTPS")
+
+Rel(client, tokenController, "Логин/получение токена", "HTTPS")
+
+Rel(client, resetController, "Сброс пароля", "HTTPS")
+
+Rel(client, verifyController, "Подтверждение e-mail/телефона", "HTTPS")
+
+Rel(regController, db, "Чтение/запись", "SQL")
+Rel(addUserController, db, "Чтение/запись", "SQL")
+Rel(tokenController, db, "Чтение/запись", "SQL")
+Rel(addUserController, accessControl, "Назначение ролей/прав", "in-process")
+Rel(tokenController, security, "Подпись/проверка JWT", "in-process")
+
+Rel(resetController, notifyAdapter, "Отправка ссылок/кодов")
+Rel(verifyController, notifyAdapter, "Отправка подтверждений")
+Rel(notifyAdapter, notifyApi, "Внешние уведомления", "HTTPS/Webhooks")
+Rel(resetController, db, "Фиксация запросов/токенов", "SQL")
+Rel(verifyController, db, "Фиксация статуса подтверждения", "SQL")
+
+@enduml
+
